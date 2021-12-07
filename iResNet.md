@@ -116,5 +116,67 @@
    - 네트워크는 학습 과정에서 어떤 ResBlock을 사용하고 어떤 ResBlock을 버릴지(가중치를 쉽게 0으로 설정하여) 쉽게 동적으로 선택할 수 있다. 단계별 학습을 위한 제안은 효율적인 정보 흐름을 위해 설계되었지만 신호를 제어할 수 있도록 설계되었다.
 
    #### 2.2 Improved projection shortcut #### 
+   
+   - 원래 ResNet 아키텍처에서 x의 차원이 F의 차원 출력과 일치하지 않을 때 요소별 추가를 가능하게 하기 위해 identity shortcut대신 projection shortcut이 x에 적용된다.
+
+   - 원래 ResNet에서 사용된 기본 projection shortcut은 다음 그림에서 (a)와 같다.
+
+   ![image](https://user-images.githubusercontent.com/66320010/144979821-7629871f-64c4-4d92-83bc-a9b97061d6a0.png)
+
+   - 원래 projection shortcut은 1 x 1 커널의 컨볼루션을 사용하여 x의 채널을 F의 출력 채널 수로 projection한다(1 x 1 컨볼루션은 stride 2로 진행하고 F의 출력과 요소별 덧셈 전에 BN이 적용된다).
+   - 그러므로 채널과 spatial matching은 1 x 1 컨볼루션에 의해 수행된다.
+   
+   - 이는 spatial size를 2로 줄일 때 1 x 1 컨볼루션(with stride 2)이 featrue maps activations의 75%를 건너뛰기 때문에 정보에 상당한 손실을 초래한다. 또한 1 x 1 컨볼루션에서 고려되는 feature map activation의 25%를 선택하기 위한 의미 있는 기준이 없다.
+   
+   - 그 후 결과는 ResBlock의 output에 더해진다. 따라서 projection shortcut의 noisy output은 다음 ResBlock에 상대적으로 정보의 절반을 기여한다.
+   
+   - 이것은 noise와 정보 손실을 야기하고 네트워크를 통한 정보의 주요 흐름을 부정적으로 교란시킬 수 있다.
+
+   - 제안된 projection shortcut은 위의 그림에서 (b)와 같다. 채널 projection에서 채널 projection을 분리한다.
+   - 그리고 spatial projection을 위해 stride 2로 3 x 3 max pooling을 수행한다.
+   - 그런다음 채널 projection을 위해 stride 1로 1 x 1 컨볼루션을 적용한 다음 BN을 적용한다.
+   - max pooling과 함께, 활성화를 위해 1 x 1 컨볼루션대해 고려되어야하는 criterion을 도입한다.
+   - 또한 spatial projection은 feature map의 모든 정보를 고려하고 다음 단계에서 고려할 가장 높은 활성화를 가진 요소를 선택한다.
+   - max pooling 의 커널은 ResBlock의 middle conv의 커널과 일치하므로 동일한 spatial window에서 계산된 요소간의 추가적인 요소가 수행된다.
+   - 제안한 projection shortcut은 정보 손실을 줄이고 실험에서 성능상의 이점을 보여준다.
+   - 정보 손실과 신호 동요를 줄이기 위한 첫번째 motivation 이외에도 제안한 projection shortcut이 다른 두 가지 이유가 있다.
+   - 두 번째로, 각 주요 단게의 start ResBlock에 max pooling을 갖는 것은 네트워크 변환 불변성을 개선하고 궁극적으로 전반적인 인식 성능을 향상 시킨다.
+   - 세 번째로는 다운 샘플링을 수행하는 각 단계의 start ResBlock은 3 x 3 컨볼루션에 의해 수행되는 소프트 다운 샘플링 간의 조합으로 볼 수 있다.
+   - 하드 다운샘플링은 분류(가장 높은 활성화가 있는 요소)에 유리하고 소프트 다운 샘플링은 모든 spatial 맥락을 잃지 않는데 기여한다(따라서 요소간의 전환이 더 원활할 때 더 나은 localization을 돕는다)
+   - 제안된 projection shortcut은 모델에 추가 매개변수를 추가하지 않는다. ResNet은 일반적으로 각 단계의 시작(단계의 ResBlock 시작)에 4개의 projection shortcut만 필요합니다. 
+   - 따라서 제안된 projection shortcut의 경우 일반적으로 계산 비용이 저렴한 최대 풀링 레이어 3개만 추가로 포함하면 되기 때문에 ResNet의 계산 비용 증가는 무시할 수 있다.
+   - 제안된 projection shortcut와 함께 이전 섹션의 단계 아이디어를 사용할 때 개선된 잔여 네트워크(iResNet)를 참조한다.
+  
    #### 2.3 Grouped building block #### 
+   
+   - bottleneck building block은 네트워크 깊이를 증가시킬 때 합리적인 계산 비용을 유지하기 위한 실질적인 고려사항으로 도입되었다.
+   
+   - 먼저 채널 수를 줄이기 위한 1 x 1 컨볼루션, 가장 작은 수의 입력/출력에서 작동하는 3 x 3 컨볼루션 bottleneck, 마지막으로 원래의 채널 수로 다시 늘리는 1 x 1 컨볼루션을 포함한다.
+   
+   - 이 설계의 이유는 적은 수의 채널에서 3 × 3 컨볼루션을 실행하여 계산 비용과 매개 변수의 수를 제어하기 위함이다.
+   - 그러나 3×3 conv는 공간 패턴을 학습할 수 있는 유일한 구성 요소이므로 매우 중요하지만 bottleneck 설계에서는 더 적은 수의 입력/출력 채널을 수신한다.
+   - 해당 논문은 3×3 컨볼루션에서 가장 많은 수의 입력/출력 채널을 포함하는 개선된 building block을 제안한다.
+   - 제안된 building block의 설계에서 그룹화된 컨볼루션을 사용하며 이를 ResGroup Block이라고 한다.
+   - 그룹화된 컨볼루션은 계산 비용과 메모리로 인한 제한을 극복하기 위해 두 개의 GPU에 모델을 배포하는 솔루션으로 사용되었다.
+   - 그룹화된 컨볼루션의 주요 아이디어는 입력 채널을 여러 그룹으로 분할하고 각 그룹에 대해 독립적으로 컨볼루션 작업을 수행하는 것이다.
+   - 이러한 방식으로 매개변수(param)와 부동소수점 연산(FLOP)의 수를 그룹 수와 동일한 비율로 줄일 수 있다.
+
+   ![image](https://user-images.githubusercontent.com/66320010/144991624-67567e4f-a59a-489c-a753-752d9bd63e1f.png)
+   
+   - 여기서 chin과 chout은 입력 및 출력 채널의 수, k1과 k2는 컨볼루션의 kernel의 크기를 나타내고 w와 h는 채널의 너비와 높이, G는 채널이 분할된 그룹의 수를 나타낸다.
+   
+   - 기존 ResNet-50과 유사한 계산 비용과 매개변수 수를 갖는 제안된 네트워크 아키텍처는 위에서 언급한 표에 나와 있다.
+   
+   - 매개변수의 수와 계산 비용을 제어하기 위해 그룹화된 컨볼루션은 3 × 3 spatial 커널과 함께 사용된다.
+ 
+   - 두 가지 아키텍처를 제안
+      1. ResGroupFix-50은 각 단계에 대한 그룹 수가 고정된 경우를 나타냄. 이 옵션은 50개 레이어에 대한 baseline보다 유사한 수의 FLOP와 8.57% 적은 파라미터를 생성함.
+      
+      2. ResGroup-50은 모든 스테이지가 그룹당 동일한 수의 채널을 갖는 방식으로 채널에 그룹 수를 조정하는 경우를 나타냄. ResGroup-50은 원래 ResNet-50 및 더 많은 FLOP와 유사한 수의 매개 변수를 가지고 있음.
+   
+   ![image](https://user-images.githubusercontent.com/66320010/144993808-31f0ac9f-48e6-4d01-bf79-a3aeb0762cbd.png)
+   
+   - 네트워크의 마지막 잔여 빌드 블록에 대한 예시적인 비교는 위 그림을 참조
+   
+   - 이 접근법으로, 3×3은 가장 많은 수의 채널을 가지고 있고 spatial 패턴을 학습할 수 있는 더 높은 능력을 가지고 있다.
    
