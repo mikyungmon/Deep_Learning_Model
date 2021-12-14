@@ -81,3 +81,60 @@ p = 얼굴이 있을 확률
 입의 왼쪽 끝 부분의 x,y 좌표, 
 입의 오른쪽 끝 부분의 x,y 좌표 
 
+### 🔉 Loss function ### 
+
+MTCNN은 classification, regression, localization 세 가지 테스크에 대하여 각각 loss를 구한 뒤 이를 가중치를 두어 합치는 방법을 취한다.
+
+#### Face classification loss #### 
+
+![image](https://user-images.githubusercontent.com/66320010/145940802-b87ca588-3ac0-4bc7-9c69-932f194b4713.png)
+
+- ydet(GT에서 얼굴이 있는지 없는지 여부 (있을 때 1, 없을 때 0)) 와 p(얼굴이 있을 확률)의 cross entropy 값을 통해 face classification loss를 구한다.
+
+#### Bounding box regression loss #### 
+
+![image](https://user-images.githubusercontent.com/66320010/145941160-25cbc872-948c-42e7-887f-4ed10e2a0b3d.png)
+
+- bbox의 왼쪽상단 x,y좌표, 높이, 너비로 이루어진 4개의 값과 GT의 값 차이를 유클리드 거리를 측정하여 loss로 사용한다.
+
+- || || 기호는 선형 대수에서의 norm을 나타내며 우측 하단의 2는 각 차원별 차이의 제곱의 합을 구하란 의미이며, 우측 상단의 2는 전체 결과값을 제곱하라는 의미이다. 이를 수식으로 풀어내면 아래와 같다.
+
+![image](https://user-images.githubusercontent.com/66320010/145942017-51f2d8dd-6ba1-4658-9609-2bb050adecdc.png)
+
+#### Facial landmark Localization loss #### 
+
+![image](https://user-images.githubusercontent.com/66320010/145942108-1bb162c2-384e-4ad5-a69f-d6b0250346e5.png)
+
+- 얼굴의 다섯개의 포인트(두 눈, 코, 입의 양쪽 끝 부분)의 x,y좌표 값과 GT의 값의 차이를 유클리드 거리로 구한다.
+
+- 10차원 벡터로 볼 수 있으며 regression loss와 비슷하게 loss계산한다.
+
+#### Total loss ####
+
+![image](https://user-images.githubusercontent.com/66320010/145942461-b7830dee-3cff-4e89-9d2c-829d22894bac.png)
+
+세 가지 loss를 엮은 최종 loss이다.
+
+- 최종 loss는 각각의 loss에 가중치를 반영하여 모두 합쳐준 것이며 수식과 P,R,O net별 가중치는 아래와 같다. 
+
+![image](https://user-images.githubusercontent.com/66320010/145942713-f36547c9-1057-4cf4-87c4-b5af6ebdd6bc.png)
+
+- N은 전체 데이터 수이며 베타는 특정 샘플이 선택되었는지 아닌지를 0과 1로 표현한다. 
+
+- 즉, Stochastic gradient descent를 적용하여 전체 데이터 셋에서 일부만 뽑아내어 loss를 계산한다는 의미이다.
+
+- αj는 각 단계마다 각 loss의 가중치를 다르게 주기위해 사용되었다. 이 논문에서는 P-Net과 R-Net에 (αdet = 1, αbox = 0.5, αlandmark = 0.5)를 주어 detection에 중점을 두었다.
+
+- Lj은 위에서 구한 각 목적별 loss값이다.
+
+![image](https://user-images.githubusercontent.com/66320010/145943073-195e573e-5fb7-4451-9442-b225d6043666.png)
+
+MTCNN은 위와 같은 loss값으로 joint training을 진행하는데 위의 그래프에서 보면 알 수 있듯이 joint training을 통해 큰 폭으로 성능이 높아진 것을 알 수 있다.
+
+### 🔉 model 학습 및 성능 ### 
+
+논문에서는 전체 loss와 모델 구조만 제시해주고 구체적으로 어떻게 학습 시켰는지는 언급하지 않는다. 
+
+아래는 기존 논문과의 단계별 성능 비교이다.
+
+![image](https://user-images.githubusercontent.com/66320010/145943273-473a45d0-a812-41e0-bc40-588dbdf54638.png)
