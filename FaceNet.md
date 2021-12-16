@@ -86,10 +86,112 @@ Zeiler&Fergus 스타일 네트워크와 최근 Inception 유형 네트워크의 
 
 그러나 triplet loss는 한 사람과 다른 모든 얼굴로부터 나온 모든 얼굴쌍에 대해 margin을 적용하려고 한다. 이를 통해 하나의 ID에 대한 얼굴이 다양하게 존재하는 동시에 다른 ID에 대한 거리 및 식별 가능성을 계속 적용할 수 있다.
 
+![image](https://user-images.githubusercontent.com/66320010/146352390-1659b4c2-611a-4745-b5cd-0dc52eaee247.png)
+
 ### 1. Triplet Loss ### 
 
-d
- 
+![image](https://user-images.githubusercontent.com/66320010/146352540-7c16305a-cd60-45a5-9436-9e91cae2d1b0.png)
+
+- Triplet loss는 anchor sample(특정 인물의 이미지), positive sample(anchor 이미지와 닮은 모습의 이미지), negative sample(anchor이미지와 닮지 않은 모습의 이미지), 3개의 샘플에 대해 loss 계산을 수행한다.
+
+- 임베딩은 f(x) ∈ R^d로 나타내어지며 이것은 이미지 x를 d차원의 유클리드 공간에 임베딩시킨다. 이 임베딩의 결과가 거리가 1인 d차원 hypersphere에 존재하도록 한다.
+
+- 여기서 특정 사람의 anchor 이미지가 다른 동일한 사람의 모든 이미지(positive)가 다른 사람의 이미지(negative)보다 가깝다는 것을 보장하고자 한다.
+
+- 즉 같은 사진은 가까운 거리에, 다른 사진 먼 거리에 있도록 유사도를 벡터 사이의 거리와 같아지게 하려는 목적이다.
+
+- 이를 식으로 표현하면 다음과 같다.
+
+![image](https://user-images.githubusercontent.com/66320010/146356839-be68c86b-a8ad-4ce8-a39d-060ae1088481.png)
+
+- 부등호 왼쪽이 anchor과 positive 사이의 거리이고 부등호 오른쪽이 anchor과 negative 사이의 거리이다. α는 positive와 negative 사이에 주고 싶은 margin을 의미한다고 생각하면 된다.
+
+- T는 training set에 있는 모든 가능한 triplets 집합이고 cardinality N을 가진다.
+
+- triplet loss L을 수학적으로 계산하면 아래와 같은 공식이 나온다.
+
+![image](https://user-images.githubusercontent.com/66320010/146357752-d9b3fd85-cc3f-4d26-ba00-6f987d277d18.png)
+
+- 가능한 모든 triplet 들을 생성한다면 쉽게 충족되는 많은 triplet이 생성된다. 이러한 triplet은 훈련에 기여하지 않으며 네트워크를 계속 통과하므로 수렴 속도가 느려진다.
+
+- 활성화되어 모델 개선에 기여할 수 있는 hard triplet을 선택하는 것이 중요하다.
+
+### 2.Triplet Selection ###
+
+- 위의 식을 만족하는 triplet을 만들면서 학습을 진행할 때, 완전 다른 사진일 때는 너무 쉽게 만족하는 경우가 있을 것이다.
+
+- 이런 경우 학습이 제대로 되지않는 문제가 발생한다.
+
+- 따라서 잘 구분하지 못하는 이 식을 만족하지 않는 triplet을 만들어야한다.
+
+- 즉, 빠른 수렴을 위해 위에서 제시한 triplet의 제약을 위반하는 triplet을 선택하는 것이 중요하다.
+
+- 따라서 최대한 먼 거리에 있는 positive를 고르고 최대한 가까운 거리에 있는 negative를 골라야한다.
+
+![image](https://user-images.githubusercontent.com/66320010/146361607-9d05c5b7-9cce-42ba-af44-2bca3ffae836.png)
+
+- 이를 각각 hard positive, hard negative로 표현한다. 
+
+- 하지만 전체 데이터에서 각각 hard point들을 찾아야한다고 할 때 계산량이 많아져 시간이 많이 필요하며 비효율적이고 overfitting이 생길 수 있다. 
+
+- 따라서 이것을 해결하기 위해서 이 논문에서는 mini batch안에 hard point를 찾도록 하는 방법을 제시한다.
+
+- 이때 hard positive를 뽑는 것보다는 모든 anchor-positive쌍을 학습에 사용하는게 실제로 더 안정적이고 약간 더 빠르게 수렴한다.
+
+- hard negative를 뽑을 때는 다음과 같은 식을 만족하는 x중에 뽑는 것이 좋은 성능을 보였다.
+
+![image](https://user-images.githubusercontent.com/66320010/146362145-4f3abbb5-155f-4b90-a534-612a3dee0aac.png)
+
+- 이러한 negative examplars를 semi-hard라고 부른다.
+
+- 이는 anchor-positive보다 anchor-negative간 거리가 더 멀긴 가지만 margin이 충분히 크지 않아서 어렵다.
+
+- 이 negatives는 내부의 margin α에 의존한다. 전에 언급했듯이, 올바른 삼중항 선택은 빠른 수렴을 위해 중요하다. 
+
+- 해당 논문은 확률적 경사하강법(SGD)동안 수렴을 향상시키는 경향이 있는 작은 미니 배치를 사용하고자 한다.
+
+- 먼저 small mini-batch를 사용할 것이고 이것은 SGD(확률적 경사하강법)를 통한 수렴 속도를 향상시킬 것이다. 또한 실행 details는 10에서 수백개의 exemplars들로 이루어진 batch를 더 효율적으로 만들 것이다.
+
+- batch size에 대한 주요 제약은 논문에서 mini-batch로부터 관련성이 높은 triplets를 고르는 방법이다. 
+
+- 논문의 대부분의 실험에서는 약 1800exemplar정도의 batch size를 사용했다.
+
+### 3. Deep Convolutional Networks ### 
+
+- 해당 논문에서는 모든 실험에서 표준 backprop 및 AdaGrad과 함께 SGD를 사용하여 CNN을 훈련시켰다. 
+
+- 대부분의 실험에서 learning rate는 0.05였고 모델을 마무리짓기 위해 더 낮추기도 하였습니다. 
+
+- 모델은 처음에 랜덤으로 초기화되었으며 cpu cluster에서 1000~2000시간 정도 훈련하다. loss의 감소는 500시간이후부터 급격하게 줄어들었지만 추가적인 훈련은 성능을 크게 향상시킬 수 있었다. margin α는 0.2로 설정되었다.
+
+- 논문에서는 두 가지 유형의 아키텍처를 사용했으며 실험 섹션에서 이들의 장단점을 더 자세히 살펴보았다. 실제적인 차이점은 매개변수와 FLOPS의 차이에 있다.
+
+- 다음 표에 표시된 첫 번째 범주는 제안한 대로 Zeiler&Fergus 아키텍처의 표준 컨볼루션 계층 사이에 1x1xd 컨볼루션 계층을 추가하여 22계층 깊이의 모델을 생성한다.
+
+![image](https://user-images.githubusercontent.com/66320010/146369703-e6e2b0fc-1aa7-415a-9c54-d2887669bde4.png)
+
+- 사용하는 두 번째 범주는 GoogLeNet 스타일의 Inception 모델을 기반으로 한다. 이 모델은 매개변수가 20배 더 적고(약 6.6M-7.5M) FLOPS가 최대 5배 더 적다(500M-1.6B 사이).
+
+## Experiments ## 
+
+
+## Summary ## 
+
+- 얼굴 인증을 위해 유클리드 공간에 임베딩을 직접 학습하는 방법을 제공한다.
+
+- 이것은 CNN bottleneck을 사용하거나 SVM 분류뿐만아니라 여러 모델과 PCA의 연결과 같은 추가 후처리가 필요한 다른 방법과 차별화된다.
+
+- 종단 간 train(end to end)은 설정을 단순화하고 당면한 작업과 관련된 손실을 직접 최적화하면 성능이 향상된다는 것을 보여준다.
+
+- 또 다른 장점은 최소한의 정렬만 필요하다는 것이다(얼굴 영역 주변의 촘촘한 자르기).
+
+- 또한 유사성 변환 정렬을 실험했고 이것이 실제 성능을 약간 향상시킬 수 있음을 확인했다.
+
+- 향후에는 오류 사례를 더 잘 이해하고 모델을 개선하며 모델 크기를 줄이고 CPU요구사항을 줄이는 데 중점을 둘 것이다.
+
+- 그리고 현재 매우 긴 교육 시간을 개선하는 방법, 예를 들어 더 작은 배치 크기와 오프라인 및 온라인 포지티브 및 네거티브 마이닝을 통한 커리큘럼 학습의 변형을 조사할 것이다.
+
+
 ## 논문 링크 ## 
 
 https://arxiv.org/pdf/1503.03832.pdf
