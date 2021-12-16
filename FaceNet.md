@@ -174,6 +174,106 @@ Zeiler&Fergus 스타일 네트워크와 최근 Inception 유형 네트워크의 
 
 ## Experiments ## 
 
+달리 언급되지 않은 경우 약 8백만 개의 서로 다른 ID로 구성된 1억 - 2억개의 훈련 얼굴 thumbnail를 사용한다.
+
+face detector가 각 이미지에서 실행되고 각 얼굴 주위에 tight한 bounding box가 생성된다.
+
+이 face thumbnails는 해당 네트워크의 입력 크기로 조정된다.
+
+실험에서 입력 크기의 범위는 96x96픽셀에서 224x224픽셀이다.
+
+### 1. Computation Accuracy Trade-off ### 
+
+![image](https://user-images.githubusercontent.com/66320010/146374342-c3a4ae00-abf7-4b9f-90e2-ab097b6e7840.png)
+
+![image](https://user-images.githubusercontent.com/66320010/146373943-0d43df50-0597-4218-a418-bcf4ab1c54af.png)
+
+- Inception 기반 모델 NN2는 NN1과 유사한 성능을 달성하지만 매개변수의 20분의 1만 있다. 그러나 FLOPS의 수는 비슷하다. 
+
+- 매개변수의 수가 더 줄어들면 분명히 어느 시점에서 성능이 감소할 것으로 예상된다. 다른 모델 아키텍처는 Inception이 이 경우처럼 정확도 손실 없이 추가 감소를 허용할 수 있다.
+
+### 2. Effect of CNN Model ###
+
+선택한 네 가지 모델의 성능에 대해 논의한다.
+
+- 1 * 1 컨볼루션을 사용하는 Zeiler&Fergus 기반 아키텍처가 있고 모델 크기를 크게 줄이는 Inception기반 모델이 있다.
+
+- 전반적으로 최종 성능에서 두 아키텍처의 상위 모델은 비슷한 성능을 보인다.
+
+- 그러나 NN3과 같은 일부 Inception 기반 모델은 FLOPS와 모델 크기를 크게 줄이면서 여전히 우수한 성능을 달성한다.
+
+![image](https://user-images.githubusercontent.com/66320010/146375252-aafe0ac6-716c-4602-90fe-f4cb285f6d19.png)
+
+### 3. Sensitivity to Image Quality ###
+
+![image](https://user-images.githubusercontent.com/66320010/146376035-a87a3515-f438-4bed-be0d-0d7feb44047c.png)
+
+- 위의 표는 다양한 이미지 크기에서 모델의 견고성을 보여준다.
+
+- 네트워크는 JPEG 압축과 관련하여 놀라울 정도로 강력하며 JPEG 품질 20까지 매우 잘 수행된다.
+
+- 성능 저하는 120 * 120 픽셀 크기 이하의 얼굴 thumbnail에 대해 매우 작으며 80x80픽셀에서도 허용 가능한 성능을 보여준다.
+
+- 네트워크가 220x220 입력 이미지로 훈련되었기 때문에 이것은 주목할 만하다. 저해상도 얼굴로 훈련하면 이 범위가 더 향상될 수 있다.
+
+### 4. Embedding Dimensionality ###
+
+![image](https://user-images.githubusercontent.com/66320010/146376853-6ae9aff5-1caa-4e60-a13b-999aebcd1ccb.png)
+
+- 큰 임베딩이 최소한 작은 것만큼 좋은 성능을 보일 것으로 예상할 수 있지만 달성하기 위해 더 많은 훈련이 필요할 수 있다.
+
+- 그러나 위의 표에서 보고된 성능의 차이는 통계적으로 유의하지 않다.
+
+- 훈련 중에 128차원 부동 벡터가 사용되지만 정확도 손실 없이 128바이트로 양자화될 수 있다는 점에 유의해야한다.
+
+- 따라서 각 얼굴은 128차원 바이트 벡터로 간결하게 표현되며 대규모 클러스터링 및 인식에 이상적이다.
+
+- 약간의 정확도 손실로 더 작은 임베딩이 가능하며 모바일 장치에서 사용할 수 있다.
+
+### 5. Amount of Training Data  ###
+
+![image](https://user-images.githubusercontent.com/66320010/146377616-47921efe-fe0f-4049-bc87-41bc91f27b22.png)
+
+다음 표는 훈련 데이터의 영향을 보여준다. 
+
+- 시간 제약으로 인해 이 평가는 더 작은 모델에서 수행되었다.
+
+- 효과는 더 큰 모델에서 클 수 있다.
+
+### 6. Performance on LFW ###
+
+- 제한이 없고 레이블이 지정된 외부 데이터에 대한 표준 프로토콜을 사용하여 LFW에서 모델을 평가했다.
+
+- L2거리의threshold를 고르기 위해 9개의 훈련셋이 나누어졌다.
+
+- 그런 다음 10번째 테스트 분할에서 classification(동일하거나 다른)이 수행된다. 선택된 최적 임계값은 8분할(1.256)을 제외한 모든 테스트 분할에 대해 1.242였다. 모델은 두 가지 모드로 평가되었다.
+
+  1. LFW의 고정된 중앙 crop이 thumbnail을 제공한다.
+  2. 전용 얼굴 detector(Picasa[3]와 유사)가 제공된 LFW 썸네일에서 실행된다다. 얼굴 정렬에 실패하면(두 이미지에서 발생) LFW 정렬이 사용된다.
+
+- 다음은 모든 error 사례들이다.
+
+![image](https://user-images.githubusercontent.com/66320010/146378414-aea7a82e-9eaf-41c2-b250-2bee31ffe46c.png)
+
+(1)에서 설명한 고정 중심 crop을 사용할 때 98.87%±0.15의 분류 정확도를 달성하고 추가 얼굴 정렬을 사용할 때 평균의 기록적인 99.63%±0.09 표준 오차를 달성한다(2). 
+
+### 7. Performance on Youtube Faces DB ###
+
+얼굴 감지기가 각 비디오에서 감지하는 처음 100개 프레임의 모든 쌍의 유사성을 사용한다. 
+
+이것은 이것은 95.12%±0.39의 분류 정확도를 제공하고, 처음 1,000개의 프레임을 사용하면 95.18%가 된다.
+
+Deepface의 91.4%와 비교했을 때 에러율이 거의 반이나 줄었고 DeepId2+와 비교하면 30%정도 에러율을 줄였다.
+
+### 8. Face Clustering ###
+
+해당 논문의 임베딩은 사용자 개인 사진을 동일한 ID를 가지는 사람들의 그룹으로 클러스터링하는데 사용된다.
+
+다음 그림은 응집 클러스터링을 사용하여 생성된 사용자 개인 사진 컬렉션의 한 클러스터를 보여준다.
+
+폐색, 조명, 포즈, 나이에 대한 놀라운 불변성을 보여준다.
+
+![image](https://user-images.githubusercontent.com/66320010/146379279-3415a9d9-50ad-4aa0-9d7c-02809a53da5a.png)
 
 ## Summary ## 
 
